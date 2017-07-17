@@ -123,7 +123,7 @@ void BtWorld::tickPhysics( U32 elapsedMs )
    // Convert it to seconds.
    const F32 elapsedSec = (F32)elapsedMs * 0.001f;
 
-   // Simulate
+   // Simulate... it is recommended to always use Bullet's default fixed timestep/
    mDynamicsWorld->stepSimulation( elapsedSec * mEditorTimeScale, smPhysicsMaxSubSteps, smPhysicsStepTime);
 
    mIsSimulating = true;
@@ -139,7 +139,6 @@ void BtWorld::getPhysicsResults()
    PROFILE_SCOPE(BtWorld_GetPhysicsResults);
 
    // Get results from scene.
-  // mScene->fetchResults( NX_RIGID_BODY_FINISHED, true );
    mIsSimulating = false;
    mTickCount++;
 }
@@ -157,9 +156,28 @@ void BtWorld::destroyWorld()
    _destroy();
 }
 
+//.logicking >>
+class btWorldClosestRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
+{
+   public:
+      btWorldClosestRayResultCallback(const btVector3&	convexFromWorld, const btVector3&	convexToWorld) :
+      ClosestRayResultCallback(convexFromWorld, convexToWorld) {};
+      virtual bool needsCollision(btBroadphaseProxy* proxy0) const
+      {
+         btCollisionObject* otherObj = (btCollisionObject*)proxy0->m_clientObject;
+         if (!otherObj->hasContactResponse())
+            return false;
+   
+         return ClosestRayResultCallback::needsCollision(proxy0);
+      }
+};
+//.logicking <<
+
 bool BtWorld::castRay( const Point3F &startPnt, const Point3F &endPnt, RayInfo *ri, const Point3F &impulse )
 {
-   btCollisionWorld::ClosestRayResultCallback result( btCast<btVector3>( startPnt ), btCast<btVector3>( endPnt ) );
+   //.logicking
+   //btCollisionWorld::ClosestRayResultCallback result( btCast<btVector3>( startPnt ), btCast<btVector3>( endPnt ) );
+   btWorldClosestRayResultCallback result(btCast<btVector3>(startPnt), btCast<btVector3>(endPnt));
    mDynamicsWorld->rayTest( btCast<btVector3>( startPnt ), btCast<btVector3>( endPnt ), result );
 
    if ( !result.hasHit() || !result.m_collisionObject )
